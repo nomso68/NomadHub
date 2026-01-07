@@ -39,13 +39,14 @@ const UserSchema = new mongoose.Schema({
         enum: ["Budget Friendly", "Fitness & Wellness", "Hiking & Nature", "Beach & Watersports", "Music & Nightlife", "Photography", "History & Museums", "Networking"]
     },
     ],
-    languages: {
+    languages: [{
         type: String,
         enum: ["English", "Spanish", "Portuguese", "Mandarin", "Hotels", "Outdoor Spaces"],
         required: true
-    },
+    }],
     deleted: { type: Boolean, default: false, select: false },
-    password: { type: String, required: true, select: false },
+    password: { type: String, required: true },
+    otp: { type: String || null }
 },
     { timestamps: true }
 );
