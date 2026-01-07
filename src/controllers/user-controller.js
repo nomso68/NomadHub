@@ -102,7 +102,7 @@ exports.generateOTP = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const hash = await bcrypt.hash(otp, 10);
 
         await Users.findOneAndUpdate({ email }, { otp: hash });
