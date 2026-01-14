@@ -2,7 +2,6 @@ const Users = require("../models/users");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const NodemailerHelper = require("nodemailer");
 // const mongoose = require("mongoose");
 const { Resend } = require("resend");
 
@@ -68,7 +67,7 @@ exports.logUserIn = async (req, res) => {
         }
         let isEqual = await bcrypt.compare(password, singleUser.password);
         if (isEqual) {
-            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY);
+            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY, { expiresIn: "1h" });
             res.json({
                 userData: {
                     full_name: singleUser.full_name,
@@ -94,7 +93,6 @@ exports.generateOTP = async (req, res) => {
     try {
         const { email } = req.body;
 
-        console.log("Generating OTP for", email);
 
         const user = await Users.findOne({
             email,
@@ -102,29 +100,16 @@ exports.generateOTP = async (req, res) => {
         });
 
         if (!user) {
-            console.log("User not found for", email);
             return res.status(404).json({ message: "User not found" });
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        console.log("Generated OTP", otp);
 
         const hash = await bcrypt.hash(otp, 10);
-        console.log("Hashed OTP", hash);
 
         await Users.findOneAndUpdate({ email }, { otp: hash });
 
-        console.log("Updated user OTP successfully");
-
-        // const transporter = NodemailerHelper.createTransport({
-        //     service: "gmail",
-        //     auth: {
-        //         user: process.env.EMAIL_USER,
-        //         pass: process.env.EMAIL_PASS
-        //     }
-        // });
         const resend = new Resend(process.env.RESEND_KEY);
-        console.log(process.env.RESEND_KEY);
 
         const result = await resend.emails.send({
             from: "NomadHub <no-reply@nomad-hub.online>",
@@ -133,14 +118,13 @@ exports.generateOTP = async (req, res) => {
             text: `Your OTP is ${otp}`,
         });
 
-        console.log("Resend response:", result);
-
-        console.log("Sent OTP to email successfully");
+        setTimeout(async () => {
+            await Users.findOneAndUpdate({ email }, { otp: null });
+        }, 60000);
 
         return res.json({ message: "OTP sent to email successfully" });
 
     } catch (err) {
-        console.error("OTP error:", err);
         return res.status(500).json({ message: "Failed to send OTP" });
     }
 };
@@ -157,7 +141,7 @@ exports.verifyOTP = async (req, res) => {
         }
         let isEqual = await bcrypt.compare(otp, singleUser.otp);
         if (isEqual) {
-            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY_OTP);
+            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY_OTP, { expiresIn: "1m" });
             res.json({
                 message: "OTP verified successfully",
                 token,
