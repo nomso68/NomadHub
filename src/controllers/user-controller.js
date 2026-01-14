@@ -92,39 +92,6 @@ exports.logUserIn = async (req, res) => {
 
 exports.generateOTP = async (req, res) => {
     try {
-<<<<<<< HEAD
-        let email = req.body.email;
-        let singleUser = await Users.findOne(
-            { email, deleted: { $in: [false, null] } },
-            { __v: 0, deleted: 0 }
-        );
-        if (!singleUser) {
-            return res.status(404).send("User not found");
-        }
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const transporter = NodemailerHelper.createTransport({
-            service: 'gmail',
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-        })
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Password Reset OTP',
-            text: `Your OTP is ${otp}`
-        }
-        transporter.sendMail(mailOptions, function (error, info) {
-            if (error) {
-                res.send("Error sending email");
-            } else {
-                res.json({ message: "OTP sent to email successfully" });
-            }
-        })
-        let hash = await bcrypt.hash(otp, saltRounds);
-        await Users.findOneAndUpdate({ email }, { otp: hash });
-        res.json({ message: "OTP sent to email successfully" });
-    } catch (err) {
-        res.send("We could not log you in");
-=======
         const { email } = req.body;
 
         console.log("Generating OTP for", email);
@@ -175,7 +142,6 @@ exports.generateOTP = async (req, res) => {
     } catch (err) {
         console.error("OTP error:", err);
         return res.status(500).json({ message: "Failed to send OTP" });
->>>>>>> 843c311dca3f5701eb3a63ebf253db896da47254
     }
 };
 
