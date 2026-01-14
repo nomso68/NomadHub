@@ -94,7 +94,6 @@ exports.generateOTP = async (req, res) => {
     try {
         const { email } = req.body;
 
-        console.log("Generating OTP for", email);
 
         const user = await Users.findOne({
             email,
@@ -102,19 +101,15 @@ exports.generateOTP = async (req, res) => {
         });
 
         if (!user) {
-            console.log("User not found for", email);
             return res.status(404).json({ message: "User not found" });
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        console.log("Generated OTP", otp);
 
         const hash = await bcrypt.hash(otp, 10);
-        console.log("Hashed OTP", hash);
 
         await Users.findOneAndUpdate({ email }, { otp: hash });
 
-        console.log("Updated user OTP successfully");
 
         // const transporter = NodemailerHelper.createTransport({
         //     service: "gmail",
@@ -124,7 +119,7 @@ exports.generateOTP = async (req, res) => {
         //     }
         // });
         const resend = new Resend(process.env.RESEND_KEY);
-        console.log(process.env.RESEND_KEY);
+        (process.env.RESEND_KEY);
 
         const result = await resend.emails.send({
             from: "NomadHub <no-reply@nomad-hub.online>",
@@ -132,10 +127,6 @@ exports.generateOTP = async (req, res) => {
             subject: "Password Reset OTP",
             text: `Your OTP is ${otp}`,
         });
-
-        console.log("Resend response:", result);
-
-        console.log("Sent OTP to email successfully");
 
         return res.json({ message: "OTP sent to email successfully" });
 
