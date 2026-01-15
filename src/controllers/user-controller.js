@@ -2,12 +2,24 @@ const Users = require("../models/users");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const NodemailerHelper = require("nodemailer");
 // const mongoose = require("mongoose");
 const { Resend } = require("resend");
-
+const { v4: uuidv4 } = require("uuid");
+const OtpToken = require("../models/otpToken");
 dotenv.config();
 const saltRounds = 10;
+const passwordValidator = require("password-validator");
+
+let schema = new passwordValidator();
+
+schema
+    .is().min(8)
+    .is().max(100)
+    .has().uppercase()
+    .has().lowercase()
+    .has().digits(1)
+    .has().symbols()
+    .has().not().spaces();
 
 exports.createUser = async (req, res) => {
     try {
@@ -22,6 +34,11 @@ exports.createUser = async (req, res) => {
             interests_and_hobbies,
             languages,
         } = req.body
+        if (!schema.validate(password)) {
+            return res.status(400).json({
+                message: "Password does not meet complexity requirements",
+            });
+        }
         let hash = await bcrypt.hash(password, saltRounds);
         let newUser = new Users({
             full_name,
@@ -68,7 +85,7 @@ exports.logUserIn = async (req, res) => {
         }
         let isEqual = await bcrypt.compare(password, singleUser.password);
         if (isEqual) {
-            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY);
+            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY, { expiresIn: "1h" });
             res.json({
                 userData: {
                     full_name: singleUser.full_name,
@@ -110,16 +127,7 @@ exports.generateOTP = async (req, res) => {
 
         await Users.findOneAndUpdate({ email }, { otp: hash });
 
-
-        // const transporter = NodemailerHelper.createTransport({
-        //     service: "gmail",
-        //     auth: {
-        //         user: process.env.EMAIL_USER,
-        //         pass: process.env.EMAIL_PASS
-        //     }
-        // });
         const resend = new Resend(process.env.RESEND_KEY);
-        (process.env.RESEND_KEY);
 
         const result = await resend.emails.send({
             from: "NomadHub <no-reply@nomad-hub.online>",
@@ -128,36 +136,42 @@ exports.generateOTP = async (req, res) => {
             text: `Your OTP is ${otp}`,
         });
 
+        setTimeout(async () => {
+            await Users.findOneAndUpdate({ email }, { otp: null });
+        }, 60000);
+
         return res.json({ message: "OTP sent to email successfully" });
 
     } catch (err) {
-        console.error("OTP error:", err);
         return res.status(500).json({ message: "Failed to send OTP" });
     }
 };
 
 exports.verifyOTP = async (req, res) => {
     try {
-        let { email, otp } = req.body;
-        let singleUser = await Users.findOne(
+        const { email, otp } = req.body;
+        const singleUser = await Users.findOne(
             { email, deleted: { $in: [false, null] } },
             { __v: 0, deleted: 0 }
         );
-        if (!singleUser) {
-            return res.status(404).send("User not found");
+        if (!singleUser || !singleUser.otp) {
+            return res.status(404).send("Invalid OTP");
         }
         let isEqual = await bcrypt.compare(otp, singleUser.otp);
         if (isEqual) {
-            let token = jwt.sign({ id: singleUser._id }, process.env.SIGNING_KEY_OTP);
+            const jti = uuidv4();
+            const token = jwt.sign({ id: singleUser._id, jti }, process.env.SIGNING_KEY_OTP, { expiresIn: "1h" });
+            await OtpToken.create({ jti, userId: singleUser._id, expiresAt: new Date(Date.now() + 3600 * 1000) });
             res.json({
                 message: "OTP verified successfully",
                 token,
             });
+            await Users.findOneAndUpdate({ email }, { otp: null });
         } else {
             return res.status(401).send("User not found");
         }
     } catch (err) {
-        res.send("We could not log you in");
+        res.send("We could not verify your OTP");
     }
 }
 
@@ -171,8 +185,13 @@ exports.resetPassword = async (req, res) => {
         if (!singleUser) {
             return res.status(404).send("User not found");
         }
+        if (!schema.validate(new_password)) {
+            return res.status(400).json({
+                message: "Password does not meet complexity requirements",
+            });
+        }
         let hash = await bcrypt.hash(new_password, saltRounds);
-        await Users.findOneAndUpdate({ email }, { password: hash, otp: null });
+        await Users.findOneAndUpdate({ email }, { password: hash });
         res.json({ message: "Password reset successfully" });
     } catch (err) {
         res.send("We could not reset your password");

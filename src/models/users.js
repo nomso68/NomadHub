@@ -41,11 +41,10 @@ const UserSchema = new mongoose.Schema({
     ],
     languages: [{
         type: String,
-        enum: ["English", "Spanish", "Portuguese", "Mandarin", "Hotels", "Outdoor Spaces"],
+        enum: ["English", "Spanish", "Portuguese", "Mandarin"],
         required: true
     }],
     deleted: { type: Boolean, default: false, select: false },
-    password: { type: String, required: true },
     otp: { type: String || null }
 },
     { timestamps: true }
